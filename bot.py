@@ -43,7 +43,6 @@ async def on_ready():
 async def check_price(interaction: discord.Interaction, game_title: str):
     await interaction.response.defer()
 
-    message = ''
     steam_game_id = 0
 
     try:    
@@ -62,19 +61,28 @@ async def check_price(interaction: discord.Interaction, game_title: str):
         data = data[steam_game_id]['data']
         price_overview = data.get('price_overview')
 
-        message += f"Gra: {data['name']}\n\n"
+        embed = discord.Embed(
+            title=data['name'],
+            description='Aktualne informacje pobrane z API Steam',
+            color=discord.Color.green(),
+            url=f"https://store.steampowered.com/app/{steam_game_id}/{data['name'].replace(' ', '_')}/",
+        )
+
+        embed.set_image(url=data['header_image'])
 
         if price_overview: 
             if price_overview['discount_percent'] > 0:
-                message += f"Wykryto promocję {price_overview['discount_percent']}%\n"
-                message += f"Cena aktualna: {price_overview['final_formatted']}\n"
-                message += f"Cena przed obniżką: {price_overview['initial_formatted']}\n"
-            else:
-                message += f"Cena aktualna: {price_overview['final_formatted']}\n"
-        else:
-            message += f"Premiera gry nastąpi: {data['release_date']['date']}\n"
+                embed.add_field(name='Wykryto promocję', value=f"{price_overview['discount_percent']}%", inline=True)
+                embed.add_field(name='Cena aktualna', value=price_overview['final_formatted'], inline=True)
+                embed.add_field(name='Cena przed obniżką', value=price_overview['initial_formatted'], inline=True)
 
-        await interaction.followup.send(message)
+            else:
+                embed.add_field(name='Cena aktualna', value=price_overview['final_formatted'])
+        else:
+            embed.add_field(name='Premiera gry nastąpi', value=data['release_date']['date'])
+        
+        embed.set_footer(text=f"Developer: {data['developers'][0]}")
+        await interaction.followup.send(embed=embed)
 
     except Exception as e: 
         await interaction.followup.send(f"Wystąpił błąd poczas pobierania danych: {e}")
@@ -83,25 +91,35 @@ async def check_price(interaction: discord.Interaction, game_title: str):
 async def games_list(interaction: discord.Interaction):
     await interaction.response.defer()
 
+    embed = discord.Embed(
+        title='Lista zapisanych gier',
+        color=discord.Color.green(),
+    )
+
     with sqlite3.connect('database.db') as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM games_list")
         rows = cursor.fetchall()
 
     if not rows:
-        await interaction.followup.send("Lista zapisanych gier jest pusta.")
+        embed.add_field(name='', value='Lista zapisanych gier jest pusta.')
+        await interaction.followup.send(embed=embed)
         return
     
-    message = 'Lista zapisanych gier:\n'
     for row in rows:
-        message += f"• {row[0]}\n"
+        embed.add_field(name='', value=f"• {row[0]}", inline=False)
     
-    await interaction.followup.send(message)
+    await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name='add_game', description='Dodaj grę to listy zapisanych gier')
 @app_commands.describe(game_title='Wpisz nazwę gry którą chcesz dodać')
 async def add_game(interaction: discord.Interaction, game_title: str):
     await interaction.response.defer()
+
+    embed = discord.Embed(
+        title='Dodawanie gry do listy',
+        color=discord.Color.green(),
+    )
 
     with sqlite3.connect('database.db') as conn:
         cursor = conn.cursor()
@@ -109,18 +127,25 @@ async def add_game(interaction: discord.Interaction, game_title: str):
         game_found = cursor.fetchone()
 
         if game_found:
-            await interaction.followup.send(f"Gra {game_title} znajduje się już na liście.")
+            embed.add_field(name='', value=f"Gra {game_title} znajduje się już na liście.")
+            await interaction.followup.send(embed=embed)
             return
         
         cursor.execute("INSERT INTO games_list (name) VALUES (?)", (game_title,))
         conn.commit()
 
-    await interaction.followup.send(f"Gra {game_title} została pomyślnie dodana do listy.")
+    embed.add_field(name='', value=f"Gra {game_title} została pomyślnie dodana do listy.")
+    await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name='remove_game', description='Usuń grę z listy zapisanych gier')
 @app_commands.describe(game_title='Wpisz nazwę gry którą chcesz usunąć')
 async def remove_game(interaction: discord.Interaction, game_title: str):
     await interaction.response.defer()
+
+    embed = discord.Embed(
+        title='Usuwanie gry z listy',
+        color=discord.Color.green(),
+    )
 
     with sqlite3.connect('database.db') as conn:
         cursor = conn.cursor()
@@ -128,8 +153,10 @@ async def remove_game(interaction: discord.Interaction, game_title: str):
         conn.commit()
 
         if cursor.rowcount > 0:
-            await interaction.followup.send(f"Gra {game_title} została usunięta z lity.")
+            embed.add_field(name='', value=f"Gra {game_title} została usunięta z lity.")
+            await interaction.followup.send(embed=embed)
         else:
-            await interaction.followup.send(f"Nie znaleziono gry {game_title} na liście.")
+            embed.add_field(name='', value=f"Nie znaleziono gry {game_title} na liście.")
+            await interaction.followup.send(embed=embed)
 
 bot.run(os.getenv('BOT_TOKEN'))
