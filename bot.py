@@ -19,7 +19,9 @@ def database_init():
     cursor.execute("""
             CREATE TABLE IF NOT EXISTS games_list (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE
+                server_id INTEGER,
+                name TEXT,
+                UNIQUE(server_id, name)
             )
     """)
 
@@ -90,6 +92,8 @@ async def check_price(interaction: discord.Interaction, game_title: str):
 @bot.tree.command(name='games_list', description='Wyświetla listę zapisanych gier')
 async def games_list(interaction: discord.Interaction):
     await interaction.response.defer()
+    
+    server_id = interaction.guild_id
 
     embed = discord.Embed(
         title='Lista zapisanych gier',
@@ -98,7 +102,7 @@ async def games_list(interaction: discord.Interaction):
 
     with sqlite3.connect('database.db') as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT name FROM games_list")
+        cursor.execute("SELECT name FROM games_list WHERE server_id = ?", (server_id,))
         rows = cursor.fetchall()
 
     if not rows:
@@ -116,6 +120,8 @@ async def games_list(interaction: discord.Interaction):
 async def add_game(interaction: discord.Interaction, game_title: str):
     await interaction.response.defer()
 
+    server_id = interaction.guild_id
+
     embed = discord.Embed(
         title='Dodawanie gry do listy',
         color=discord.Color.green(),
@@ -123,7 +129,7 @@ async def add_game(interaction: discord.Interaction, game_title: str):
 
     with sqlite3.connect('database.db') as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM games_list WHERE name = ?", (game_title,))
+        cursor.execute("SELECT id FROM games_list WHERE name = ? AND server_id = ?", (game_title, server_id,))
         game_found = cursor.fetchone()
 
         if game_found:
@@ -131,7 +137,7 @@ async def add_game(interaction: discord.Interaction, game_title: str):
             await interaction.followup.send(embed=embed)
             return
         
-        cursor.execute("INSERT INTO games_list (name) VALUES (?)", (game_title,))
+        cursor.execute("INSERT INTO games_list (name, server_id) VALUES (?, ?)", (game_title, server_id,))
         conn.commit()
 
     embed.add_field(name='', value=f"Gra {game_title} została pomyślnie dodana do listy.")
@@ -142,6 +148,8 @@ async def add_game(interaction: discord.Interaction, game_title: str):
 async def remove_game(interaction: discord.Interaction, game_title: str):
     await interaction.response.defer()
 
+    server_id = interaction.guild_id
+
     embed = discord.Embed(
         title='Usuwanie gry z listy',
         color=discord.Color.green(),
@@ -149,7 +157,7 @@ async def remove_game(interaction: discord.Interaction, game_title: str):
 
     with sqlite3.connect('database.db') as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM games_list WHERE name = ?", (game_title,))
+        cursor.execute("DELETE FROM games_list WHERE name = ? AND server_id = ?", (game_title, server_id))
         conn.commit()
 
         if cursor.rowcount > 0:
