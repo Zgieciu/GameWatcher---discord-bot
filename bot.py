@@ -85,6 +85,8 @@ async def check_price(interaction: discord.Interaction, game_title: str):
                 embed.add_field(name='Cena przed obniżką', value=price_overview['initial_formatted'], inline=True)
             else:
                 embed.add_field(name='Cena aktualna', value=price_overview['final_formatted'])
+        elif data['is_free']:
+            embed.add_field(name='Gra jest darmowa', value='')
         else:
             embed.add_field(name='Premiera gry nastąpi', value=data['release_date']['date'])
         
