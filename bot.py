@@ -29,6 +29,26 @@ def database_init():
     conn.close()
     print("Baza danych została zainicjowana.")
 
+def get_game_data(game_title):
+    steam_game_id = None
+
+    response = requests.get(f"https://store.steampowered.com/api/storesearch/?term={game_title}&l=polish&cc=PL")
+    data = response.json()
+
+    for item in data['items']:
+        if game_title.upper() in item['name'].strip().upper():
+            steam_game_id = str(item['id'])
+            break
+
+    if not steam_game_id:
+        raise Exception('Nie znaleziono podanej gry')         
+    
+    response = requests.get(f"https://store.steampowered.com/api/appdetails?appids={steam_game_id}&cc=pl")
+    data = response.json()
+    data = data[steam_game_id]['data']
+
+    return steam_game_id, data
+
 @bot.event
 async def on_ready():
     print(f"Zalogowano jako {bot.user.name}!")
@@ -45,22 +65,8 @@ async def on_ready():
 async def check_price(interaction: discord.Interaction, game_title: str):
     await interaction.response.defer()
 
-    steam_game_id = 0
-
     try:    
-        response = requests.get(f"https://store.steampowered.com/api/storesearch/?term={game_title}&l=polish&cc=PL")
-        data = response.json()
-        for item in data['items']:
-            if game_title.upper() in item['name'].strip().upper():
-                steam_game_id = str(item['id'])
-                break
-
-        if not steam_game_id:
-            raise Exception('Nie znaleziono podanej gry')         
-        
-        response = requests.get(f"https://store.steampowered.com/api/appdetails?appids={steam_game_id}&cc=pl")
-        data = response.json()
-        data = data[steam_game_id]['data']
+        steam_game_id, data = get_game_data(game_title)
         price_overview = data.get('price_overview')
 
         embed = discord.Embed(
@@ -77,7 +83,6 @@ async def check_price(interaction: discord.Interaction, game_title: str):
                 embed.add_field(name='Wykryto promocję', value=f"{price_overview['discount_percent']}%", inline=True)
                 embed.add_field(name='Cena aktualna', value=price_overview['final_formatted'], inline=True)
                 embed.add_field(name='Cena przed obniżką', value=price_overview['initial_formatted'], inline=True)
-
             else:
                 embed.add_field(name='Cena aktualna', value=price_overview['final_formatted'])
         else:
