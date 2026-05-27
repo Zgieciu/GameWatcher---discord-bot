@@ -47,6 +47,10 @@ def get_game_data(game_title):
     data = response.json()
     data = data[steam_game_id]['data']
 
+    response = requests.get(f"https://store.steampowered.com/appreviews/{steam_game_id}?json=1&language=all&purchase_type=all&l=polish")
+    review_data = response.json()
+    data['reviews'] = review_data['query_summary']
+
     return steam_game_id, data
 
 @bot.event
@@ -91,6 +95,16 @@ async def check_price(interaction: discord.Interaction, game_title: str):
             embed.add_field(name='Premiera gry nastąpi', value=data['release_date']['date'])
         
         embed.set_footer(text=f"Developer: {data['developers'][0]}")
+
+        reviews = data['reviews']
+        if reviews['total_reviews'] > 0:
+            positive_percent = round(reviews['total_positive'] / reviews['total_reviews'] * 100)
+            formatted_total = f"{reviews['total_positive']:_}".replace('_', ' ')
+
+            embed.add_field(name='Recenzje użytkowników', 
+                            value=f"Liczba recenzji - {formatted_total}\n{reviews['review_score_desc']} - {positive_percent}% pozytywnych", 
+                            inline=False) 
+
         await interaction.followup.send(embed=embed)
 
     except Exception as e: 
